@@ -1,6 +1,30 @@
 @NoSQL_HostAddress = http://localhost:5133
 
-GET {{NoSQL_HostAddress}}/weatherforecast/
+### Send Message
+POST {{NoSQL_HostAddress}}/api/Messages
+Content-Type: application/json
 Accept: application/json
 
-###
+{
+    "senderId": "12345678-1234-1234-1234-123456789012",
+    "receiverId": "87654321-5678-5678-5678-987654321098",
+    "content": "First text message!"
+}
+
+### Get Messages
+GET {{NoSQL_HostAddress}}/api/Messages/12345678-1234-1234-1234-123456789012/87654321-5678-5678-5678-987654321098
+
+
+
+### Send message
+POST https://localhost:5001/api/Messages
+Content-Type: application/json
+
+{
+    "senderId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "receiverId": "c9b85f64-1234-4562-b3fc-2c963f66bfb7",
+    "content": "Hello!"
+}
+
+### Get messages
+GET https://localhost:5001/api/Messages/3fa85f64-5717-4562-b3fc-2c963f66afa6/c9b85f64-1234-4562-b3fc-2c963f66bfb7
