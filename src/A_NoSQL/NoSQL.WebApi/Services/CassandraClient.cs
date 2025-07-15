@@ -4,30 +4,38 @@ namespace NoSQL.WebApi.Services;
 
 public class CassandraClient : IDisposable
 {
-    private readonly Cassandra.ISession _session;
     private readonly ICluster _cluster;
+    private readonly Cassandra.ISession? _session;
     private readonly ILogger<CassandraClient> _logger;
+    private readonly List<string> _contactPoints;
+    private readonly int _port;
+    private readonly string _dc;
 
     public CassandraClient(IConfiguration configuration, ILogger<CassandraClient> logger)
     {
         _logger = logger;
         var cassandraSettings = configuration.GetSection("CassandraSettings");
-        var contactPoints = cassandraSettings.GetSection("ContactPoints").Get<List<string>>();
-        var port = cassandraSettings.GetValue<int>("Port");
-        var keyspace = cassandraSettings.GetValue<string>("Keyspace");
+        _contactPoints = cassandraSettings.GetSection("ContactPoints").Get<List<string>>() ?? new List<string> { "cassandra1" };
+        _port = cassandraSettings.GetValue<int>("Port", 9042);
+        _dc = cassandraSettings.GetValue<string>("DataCenter") ?? "datacenter1";
 
         _cluster = Cluster.Builder()
-                        .AddContactPoints(contactPoints.ToArray())
-                        .WithPort(port)
-                        .WithLoadBalancingPolicy(new DCAwareRoundRobinPolicy("datacenter1"))
+                        .AddContactPoints(_contactPoints.ToArray())
+                        .WithPort(_port)
+                        .WithLoadBalancingPolicy(new DCAwareRoundRobinPolicy(_dc))
                         .Build();
 
-        _session = _cluster.Connect(keyspace);
-        _logger.LogTrace($"Successfully connected to Cassandra keyspace: {keyspace}");
+        _session = _cluster.Connect();
+        _logger.LogTrace("Connected to Cassandra (no keyspace).");
     }
 
-    public Cassandra.ISession GetSession()
-        => _session;
+    public Cassandra.ISession GetSession() => _session!;
+
+    public void ChangeKeyspace(string keyspace)
+    {
+        _session?.ChangeKeyspace(keyspace);
+        _logger.LogTrace($"Changed session to keyspace: {keyspace}");
+    }
 
     public void Dispose()
     {

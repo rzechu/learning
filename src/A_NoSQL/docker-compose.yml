@@ -14,16 +14,18 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra1
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
       - CASSANDRA_SEEDS=cassandra1
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
     volumes:
       - cassandra1_data:/var/lib/cassandra
     networks:
       - cassandra_network
-    healthcheck: 
-      test: ["CMD", "cqlsh", "-e", "describe cluster"]
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 30s
+      start_period: 40s
 
   cassandra2:
     image: cassandra:latest
@@ -31,7 +33,7 @@ services:
     hostname: cassandra2
     ports:
       - "9043:9042"
-  #  command: ["sh", "-c", "sleep 15 && /usr/local/bin/docker-entrypoint.sh cassandra -f"]
+    command: ["sh", "-c", "sleep 45 && /usr/local/bin/docker-entrypoint.sh cassandra -f"]
     environment:
       - CASSANDRA_CLUSTER_NAME=MyMessagingCluster
       - CASSANDRA_DC=datacenter1
@@ -39,6 +41,8 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra2
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
       - CASSANDRA_SEEDS=cassandra1
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
     volumes:
       - cassandra2_data:/var/lib/cassandra
     networks:
@@ -59,7 +63,7 @@ services:
     hostname: cassandra3
     ports:
       - "9044:9042"
-  #  command: ["sh", "-c", "sleep 15 && /usr/local/bin/docker-entrypoint.sh cassandra -f"]
+    command: ["sh", "-c", "sleep 45 && /usr/local/bin/docker-entrypoint.sh cassandra -f"]
     environment:
       - CASSANDRA_CLUSTER_NAME=MyMessagingCluster
       - CASSANDRA_DC=datacenter1
@@ -67,6 +71,8 @@ services:
       - CASSANDRA_BROADCAST_ADDRESS=cassandra3
       - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
       - CASSANDRA_SEEDS=cassandra1
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
     volumes:
       - cassandra3_data:/var/lib/cassandra
     networks:
@@ -90,7 +96,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
+#      - ASPNETCORE_HTTPS_PORTS=8081
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -106,8 +112,8 @@ services:
         condition: service_healthy
       cassandra2:
         condition: service_healthy
-      cassandra3:
-        condition: service_healthy
+      # cassandra3:
+      #   condition: service_healthy
 
 volumes:
   cassandra1_data:

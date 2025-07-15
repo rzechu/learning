@@ -32,20 +32,23 @@ public class Program
 
         builder.Services.AddSingleton<ICassandraMigrationService, CassandraMigrationService>();
         builder.Services.AddScoped<IMessageRepository, CassandraMessageRepository>();
-    
+
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment())
-        {
+        //if (app.Environment.IsDevelopment())
+        //{
             app.UseSwagger();
             app.UseSwaggerUI();
-        }
+        //}
 
         using (var scope = app.Services.CreateScope())
         {
             var migrationService = scope.ServiceProvider.GetRequiredService<ICassandraMigrationService>();
             await migrationService.InitializeDatabaseSchemaAsync();
+
+            var cassandraClient = scope.ServiceProvider.GetRequiredService<CassandraClient>();
+            cassandraClient.ChangeKeyspace("messaging_app");
         }
 
         app.UseHttpsRedirection();
