@@ -1,0 +1,90 @@
+services:
+  mongo1:
+    image: mongo:6.0
+    container_name: mongo1
+    ports:
+      - "27017:27017"
+    command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
+    volumes:
+      - mongo1_data:/data/db
+    mem_limit: 512m
+    networks:
+      - app-network
+
+  mongo2:
+    image: mongo:6.0
+    container_name: mongo2
+    command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
+    volumes:
+      - mongo2_data:/data/db
+    mem_limit: 512m
+    depends_on:
+      - mongo1
+    networks:
+      - app-network
+
+  mongo3:
+    image: mongo:6.0
+    container_name: mongo3
+    command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
+    volumes:
+      - mongo3_data:/data/db
+    mem_limit: 512m
+    depends_on:
+      - mongo1
+    networks:
+      - app-network
+
+  # INITIALIZE REPLICA SET
+  init-mongo:
+    image: mongo:6.0
+    container_name: init-mongo
+    depends_on:
+      mongo1:
+        condition: service_started
+      mongo2:
+        condition: service_started
+      mongo3:
+        condition: service_started
+    networks:
+      - app-network
+    command: >
+      mongosh --host mongo1:27017 --eval "
+        rs.initiate({
+          _id: 'myReplicaSet',
+          members: [
+            { _id: 0, host: 'mongo1:27017' },
+            { _id: 1, host: 'mongo2:27017' },
+            { _id: 2, host: 'mongo3:27017' }
+          ]
+        }, { force: true });"
+
+  mongo.webapi:
+    build:
+      context: ./Mongo.WebApi
+      dockerfile: Dockerfile
+    image: mongo-webapi:latest
+    container_name: mongo-webapi
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+    networks:
+      - app-network
+    depends_on:
+      - init-mongo 
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
