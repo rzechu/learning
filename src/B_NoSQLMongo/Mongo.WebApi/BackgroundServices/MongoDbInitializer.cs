@@ -21,12 +21,8 @@ public class MongoDbInitializer : IHostedService
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("MongoDB Initializer starting (ensuring collections/indexes)...");
-
-        // Removed the call to EnsureReplicaSetInitiated as it's now handled by docker-compose's init-mongo service
         await EnsureCollectionExistsAndIndexes(cancellationToken);
     }
-
-    // Removed the private async Task EnsureReplicaSetInitiated(...) method
 
     private async Task EnsureCollectionExistsAndIndexes(CancellationToken cancellationToken)
     {
@@ -54,6 +50,7 @@ public class MongoDbInitializer : IHostedService
             _logger.LogInformation($"Creating index on CustomerId for '{_mongoDbSettings.CollectionName}' collection.");
             var orderCollection = database.GetCollection<Order>(_mongoDbSettings.CollectionName); // Use specific type for index creation
             var customerIdIndexKeys = Builders<Order>.IndexKeys.Ascending(o => o.CustomerId);
+
             // CORRECTED: CreateIndexModel only needs IndexKeysDefinition and CreateIndexOptions
             var customerIdIndexModel = new CreateIndexModel<Order>(customerIdIndexKeys, new CreateIndexOptions { Name = "CustomerId_idx" });
             await orderCollection.Indexes.CreateOneAsync(customerIdIndexModel, cancellationToken: cancellationToken);
@@ -62,6 +59,7 @@ public class MongoDbInitializer : IHostedService
             // Example: Create an index on Status for efficient background job queries
             _logger.LogInformation($"Creating index on Status for '{_mongoDbSettings.CollectionName}' collection.");
             var statusIndexKeys = Builders<Order>.IndexKeys.Ascending(o => o.Status).Ascending(o => o.CreatedAt); // Composite index
+
             // CORRECTED: CreateIndexModel only needs IndexKeysDefinition and CreateIndexOptions
             var statusIndexModel = new CreateIndexModel<Order>(statusIndexKeys, new CreateIndexOptions { Name = "Status_CreatedAt_idx" });
             await orderCollection.Indexes.CreateOneAsync(statusIndexModel, cancellationToken: cancellationToken);
@@ -73,7 +71,6 @@ public class MongoDbInitializer : IHostedService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during MongoDB collection/index setup.");
-            // Potentially re-throw or handle critical errors
         }
     }
 

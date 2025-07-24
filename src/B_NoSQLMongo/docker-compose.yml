@@ -14,6 +14,8 @@ services:
   mongo2:
     image: mongo:6.0
     container_name: mongo2
+    ports:
+      - "27018:27017"
     command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
     volumes:
       - mongo2_data:/data/db
@@ -26,6 +28,8 @@ services:
   mongo3:
     image: mongo:6.0
     container_name: mongo3
+    ports:
+      - "27019:27017"
     command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
     volumes:
       - mongo3_data:/data/db
