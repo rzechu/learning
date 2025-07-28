@@ -1,7 +1,4 @@
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 using Sharding.WebApi.Services;
-using Sharding.WebApi.Settings;
 
 namespace Sharding.WebApi;
 
@@ -11,13 +8,15 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        var mongoDbConnectionString = builder.Configuration.GetConnectionString("MongoDB") ?? "mongodb://localhost:27017";
+        // Get MongoDB connection details, prioritizing environment variables
+        var mongoHost = Environment.GetEnvironmentVariable("MONGODB_HOST") ?? "mongos1";
+        var mongoPort = Environment.GetEnvironmentVariable("MONGODB_PORT") ?? "27017";
+        var mongoDbConnectionString = $"mongodb://{mongoHost}:{mongoPort}";
         var databaseName = builder.Configuration["MongoDB:DatabaseName"] ?? "ehr_db";
 
-        builder.Services.AddSingleton(new MongoDBService(mongoDbConnectionString, databaseName));
-
-
-        builder.Services.AddScoped<MongoDBService>(); 
+        // Register as scoped service with proper connection string
+        builder.Services.AddScoped<MongoDBService>(sp =>
+            new MongoDBService(mongoDbConnectionString, databaseName));
 
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
@@ -25,13 +24,9 @@ public class Program
 
         var app = builder.Build();
 
-        //if (app.Environment.IsDevelopment())
-        //{
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        //}
+        app.UseSwagger();
+        app.UseSwaggerUI();
 
-        //app.UseHttpsRedirection();
         app.UseAuthorization();
         app.MapControllers();
 

@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
-using Sharding.WebApi.Models;
-using Sharding.WebApi.Settings;
 using MongoDB.Driver;
+using Sharding.WebApi.Settings;
 
 namespace Sharding.WebApi.BackgroundServices;
 
@@ -9,9 +8,9 @@ public class MongoDbInitializer : IHostedService
 {
     private readonly ILogger<MongoDbInitializer> _logger;
     private readonly IMongoClient _mongoClient;
-    private readonly MongoDbSettings _mongoDbSettings;
+    private readonly MongoDBSettings _mongoDbSettings;
 
-    public MongoDbInitializer(ILogger<MongoDbInitializer> logger, IMongoClient mongoClient, IOptions<MongoDbSettings> mongoDbSettings)
+    public MongoDbInitializer(ILogger<MongoDbInitializer> logger, IMongoClient mongoClient, IOptions<MongoDBSettings> mongoDbSettings)
     {
         _logger = logger;
         _mongoClient = mongoClient;

@@ -1,22 +1,24 @@
 version: '3.8'
 
 services:
-   # --- Config Servers ---
-   cfgsvr1:
+  # --- Config Servers ---
+  cfgsvr1:
     image: mongo:6.0
     container_name: cfgsvr1
-    command: > # Multi-line command
-      bash -c "mongod --configsvr --replSet cfgReplSet --port 27017 --bind_ip_all
-      && mongosh --port 27017 /docker-entrypoint-initdb.d/init_config_rs.js"
+    command: mongod --configsvr --replSet cfgReplSet --port 27017 --bind_ip_all
     volumes:
       - cfg1-data:/data/db
-      - ./mongo-init-scripts:/docker-entrypoint-initdb.d # Mount init scripts
+      - ./mongo-init-scripts:/scripts
     networks:
       - mongoshard-net
-    mem_limit: 512m
+    mem_limit: 1536m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   cfgsvr2:
+  cfgsvr2:
     image: mongo:6.0
     container_name: cfgsvr2
     command: mongod --configsvr --replSet cfgReplSet --port 27017 --bind_ip_all
@@ -24,10 +26,14 @@ services:
       - cfg2-data:/data/db
     networks:
       - mongoshard-net
-    mem_limit: 512m
+    mem_limit: 1536m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   cfgsvr3:
+  cfgsvr3:
     image: mongo:6.0
     container_name: cfgsvr3
     command: mongod --configsvr --replSet cfgReplSet --port 27017 --bind_ip_all
@@ -35,25 +41,48 @@ services:
       - cfg3-data:/data/db
     networks:
       - mongoshard-net
-    mem_limit: 512m
+    mem_limit: 1536m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   # --- Shard 1 Replica Set ---
-   shard1a:
+  # --- Config Server Initializer ---
+  cfg-init:
     image: mongo:6.0
-    container_name: shard1a
+    container_name: cfg-init
+    depends_on:
+      - cfgsvr1
+      - cfgsvr2
+      - cfgsvr3
     command: >
-      bash -c "mongod --shardsvr --replSet shard1ReplSet --port 27017 --bind_ip_all
-      && mongosh --port 27017 /docker-entrypoint-initdb.d/init_shard1_rs.js"
+      bash -c "
+        echo 'Waiting for config servers to start...' &&
+        sleep 30 &&
+        mongosh --host cfgsvr1 --port 27017 /scripts/init_config_rs.js"
     volumes:
-      - shard1a-data:/data/db
-      - ./mongo-init-scripts:/docker-entrypoint-initdb.d # Mount init scripts
+      - ./mongo-init-scripts:/scripts
     networks:
       - mongoshard-net
-    mem_limit: 512m
-    mem_swappiness: 0
 
-   shard1b:
+  # --- Shard 1 Replica Set ---
+  shard1a:
+    image: mongo:6.0
+    container_name: shard1a
+    command: mongod --shardsvr --replSet shard1ReplSet --port 27017 --bind_ip_all
+    volumes:
+      - shard1a-data:/data/db
+    networks:
+      - mongoshard-net
+    mem_limit: 1536m
+    mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  shard1b:
     image: mongo:6.0
     container_name: shard1b
     command: mongod --shardsvr --replSet shard1ReplSet --port 27017 --bind_ip_all
@@ -61,25 +90,47 @@ services:
       - shard1b-data:/data/db
     networks:
       - mongoshard-net
-    mem_limit: 512m
+    mem_limit: 1536m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   # --- Shard 2 Replica Set ---
-   shard2a:
+  # --- Shard 1 Initializer ---
+  shard1-init:
     image: mongo:6.0
-    container_name: shard2a
+    container_name: shard1-init
+    depends_on:
+      - shard1a
+      - shard1b
     command: >
-      bash -c "mongod --shardsvr --replSet shard2ReplSet --port 27017 --bind_ip_all
-      && mongosh --port 27017 /docker-entrypoint-initdb.d/init_shard2_rs.js"
+      bash -c "
+        echo 'Waiting for shard1 servers to start...' &&
+        sleep 30 &&
+        mongosh --host shard1a --port 27017 /scripts/init_shard1_rs.js"
     volumes:
-      - shard2a-data:/data/db
-      - ./mongo-init-scripts:/docker-entrypoint-initdb.d # Mount init scripts
+      - ./mongo-init-scripts:/scripts
     networks:
       - mongoshard-net
-    mem_limit: 512m
-    mem_swappiness: 0
 
-   shard2b:
+  # --- Shard 2 Replica Set ---
+  shard2a:
+    image: mongo:6.0
+    container_name: shard2a
+    command: mongod --shardsvr --replSet shard2ReplSet --port 27017 --bind_ip_all
+    volumes:
+      - shard2a-data:/data/db
+    networks:
+      - mongoshard-net
+    mem_limit: 1536m
+    mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+
+  shard2b:
     image: mongo:6.0
     container_name: shard2b
     command: mongod --shardsvr --replSet shard2ReplSet --port 27017 --bind_ip_all
@@ -87,31 +138,68 @@ services:
       - shard2b-data:/data/db
     networks:
       - mongoshard-net
-    mem_limit: 512m
+    mem_limit: 1536m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   # --- Mongos (Query Router) ---
-   mongos1:
+  # --- Shard 2 Initializer ---
+  shard2-init:
+    image: mongo:6.0
+    container_name: shard2-init
+    depends_on:
+      - shard2a
+      - shard2b
+    command: >
+      bash -c "
+        echo 'Waiting for shard2 servers to start...' &&
+        sleep 30 &&
+        mongosh --host shard2a --port 27017 /scripts/init_shard2_rs.js"
+    volumes:
+      - ./mongo-init-scripts:/scripts
+    networks:
+      - mongoshard-net
+
+  # --- Mongos (Query Router) ---
+  mongos1:
     image: mongo:6.0
     container_name: mongos1
-    # Command to start mongos, then run the sharding setup script
-    command: >
-      bash -c "mongos --port 27017 --configdb cfgReplSet/cfgsvr1:27017,cfgsvr2:27017,cfgsvr3:27017 --bind_ip_all
-      && mongosh --port 27017 /docker-entrypoint-initdb.d/setup_sharding.js"
+    command: mongos --port 27017 --configdb cfgReplSet/cfgsvr1:27017,cfgsvr2:27017,cfgsvr3:27017 --bind_ip_all
     ports:
-      - "27017:27017" # Expose mongos port for client applications
+      - "27017:27017"
     networks:
       - mongoshard-net
     depends_on:
-      - cfgsvr1
-      - cfgsvr2
-      - cfgsvr3
-      - shard1a # Ensure shards are started too
-      - shard2a # Ensure shards are started too
-    mem_limit: 512m
+      - cfg-init
+      - shard1-init
+      - shard2-init
+    mem_limit: 1024m
     mem_swappiness: 0
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
 
-   sharding.webapi:
+  # --- Mongos Initializer ---
+  mongos-init:
+    image: mongo:6.0
+    container_name: mongos-init
+    depends_on:
+      - mongos1
+    command: >
+      bash -c "
+        echo 'Waiting for mongos to start...' &&
+        sleep 45 &&
+        mongosh --host mongos1 --port 27017 /scripts/setup_sharding.js"
+    volumes:
+      - ./mongo-init-scripts:/scripts
+    networks:
+      - mongoshard-net
+ 
+# --- Sharding Web API ---
+  sharding.webapi:
     build:
       context: ./Sharding.WebApi
       dockerfile: Dockerfile
@@ -120,17 +208,18 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
+      - MONGODB_HOST=mongos1
+      - MONGODB_PORT=27017
     ports:
       - "8080:8080"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
-      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
     networks:
       - mongoshard-net
     depends_on:
-      - mongos1
+      mongos1:
+        condition: service_healthy
 
 volumes:
   cfg1-data:
