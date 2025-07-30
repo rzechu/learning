@@ -4,7 +4,7 @@ namespace Sharding.WebApi;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public async static Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +29,13 @@ public class Program
 
         app.UseAuthorization();
         app.MapControllers();
+
+        // Seed clinics
+        using (var scope = app.Services.CreateScope())
+        {
+            var mongoService = scope.ServiceProvider.GetRequiredService<MongoDBService>();
+            await mongoService.EnsureDatabaseSeededAsync();
+        }
 
         app.Run();
     }

@@ -28,6 +28,7 @@ public class MongoDBService
 
             // Don't block in constructor - this will run when first needed
             // SeedClinicsAsync().Wait(); - REMOVE THIS
+            Console.WriteLine("Seeded");
         }
         catch (Exception ex)
         {
@@ -56,6 +57,7 @@ public class MongoDBService
                 };
 
                 await _clinicsCollection.InsertManyAsync(clinics);
+                Console.WriteLine("Seeding done");
             }
         }
         catch (Exception ex)

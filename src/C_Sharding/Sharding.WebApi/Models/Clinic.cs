@@ -7,7 +7,7 @@ public class Clinic
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } // MongoDB's _id
+    public ObjectId Id { get; set; } // MongoDB's _id
     public string ClinicId { get; set; } // Shard key
     public string Name { get; set; }
     public string Location { get; set; }

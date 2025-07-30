@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Sharding.WebApi.Models;
 using Sharding.WebApi.Settings;
 
 namespace Sharding.WebApi.BackgroundServices;
@@ -28,42 +29,30 @@ public class MongoDbInitializer : IHostedService
         _logger.LogInformation("Ensuring collection and indexes are set up...");
         try
         {
-            //var database = _mongoClient.GetDatabase(_mongoDbSettings.DatabaseName);
+            var database = _mongoClient.GetDatabase(_mongoDbSettings.DatabaseName);
 
-            //var collection = database.GetCollection<object>(_mongoDbSettings.CollectionName); // Using object for generic checks
+            var clinicsCollection = database.GetCollection<Clinic>("Clinics");
+            await clinicsCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<Clinic>(
+                    Builders<Clinic>.IndexKeys.Ascending(c => c.ClinicId),
+                    new CreateIndexOptions { Unique = true, Name = "ClinicId_idx" }));
 
-            //// Check if collection exists (MongoDB implicitly creates on first write, but this verifies connectivity)
-            //var collections = await database.ListCollectionNames().ToListAsync(cancellationToken);
-            //if (!collections.Contains(_mongoDbSettings.CollectionName))
-            //{
-            //    _logger.LogInformation($"Collection '{_mongoDbSettings.CollectionName}' does not exist yet. It will be created on first data insertion.");
-            //    // You could optionally create it explicitly if you prefer:
-            //    // await database.CreateCollectionAsync(_mongoDbSettings.CollectionName, cancellationToken: cancellationToken);
-            //}
-            //else
-            //{
-            //    _logger.LogInformation($"Collection '{_mongoDbSettings.CollectionName}' already exists.");
-            //}
+            var patientsCollection = database.GetCollection<Patient>("Patients");
+            await patientsCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<Patient>(
+                    Builders<Patient>.IndexKeys.Combine(
+                        Builders<Patient>.IndexKeys.Ascending(p => p.ClinicId),
+                        Builders<Patient>.IndexKeys.Ascending(p => p.PatientId)),
+                    new CreateIndexOptions { Unique = true, Name = "Clinic_Patient_idx" }));
 
-            //// Example: Create an index on CustomerId for efficient retrieval
-            //_logger.LogInformation($"Creating index on CustomerId for '{_mongoDbSettings.CollectionName}' collection.");
-            //var orderCollection = database.GetCollection<Order>(_mongoDbSettings.CollectionName); // Use specific type for index creation
-            //var customerIdIndexKeys = Builders<Order>.IndexKeys.Ascending(o => o.CustomerId);
-
-            //// CORRECTED: CreateIndexModel only needs IndexKeysDefinition and CreateIndexOptions
-            //var customerIdIndexModel = new CreateIndexModel<Order>(customerIdIndexKeys, new CreateIndexOptions { Name = "CustomerId_idx" });
-            //await orderCollection.Indexes.CreateOneAsync(customerIdIndexModel, cancellationToken: cancellationToken);
-            //_logger.LogInformation("Index on CustomerId created/ensured.");
-
-            //// Example: Create an index on Status for efficient background job queries
-            //_logger.LogInformation($"Creating index on Status for '{_mongoDbSettings.CollectionName}' collection.");
-            //var statusIndexKeys = Builders<Order>.IndexKeys.Ascending(o => o.Status).Ascending(o => o.CreatedAt); // Composite index
-
-            //// CORRECTED: CreateIndexModel only needs IndexKeysDefinition and CreateIndexOptions
-            //var statusIndexModel = new CreateIndexModel<Order>(statusIndexKeys, new CreateIndexOptions { Name = "Status_CreatedAt_idx" });
-            //await orderCollection.Indexes.CreateOneAsync(statusIndexModel, cancellationToken: cancellationToken);
-            //_logger.LogInformation("Index on Status and CreatedAt created/ensured.");
-
+            var visitsCollection = database.GetCollection<Visit>("Visits");
+            await visitsCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<Visit>(
+                    Builders<Visit>.IndexKeys.Combine(
+                        Builders<Visit>.IndexKeys.Ascending(v => v.ClinicId),
+                        Builders<Visit>.IndexKeys.Ascending(v => v.PatientId),
+                        Builders<Visit>.IndexKeys.Descending(v => v.VisitDate)),
+                    new CreateIndexOptions { Name = "VisitSearch_idx" }));
 
             _logger.LogInformation("MongoDB collection and index setup finished successfully.");
         }
