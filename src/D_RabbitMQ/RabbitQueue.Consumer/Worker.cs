@@ -25,11 +25,9 @@ namespace RabbitQueue.Consumer
 
             _hostname = _configuration["RabbitMQ:Host"] ?? throw new ArgumentNullException("RabbitMQ:Host is not configured.");
             _queueName = _configuration["RabbitMQ:QueueName"] ?? "payment_queue";
-
-            InitializeRabbitMqAsync();
         }
 
-        private async Task InitializeRabbitMqAsync()
+        private async Task<bool> InitializeRabbitMqAsync()
         {
             try
             {
@@ -43,22 +41,28 @@ namespace RabbitQueue.Consumer
                                       autoDelete: false,
                                       arguments: null);
 
-                // Ensure only one message is delivered to a consumer at a time
-                // This is important for reliable processing and avoiding multiple consumers processing the same message
                 await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
                 _logger.LogInformation("Consumer connected to RabbitMQ and declared queue '{QueueName}'", _queueName);
+                return true;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Could not initialize RabbitMQ connection for consumer at {Hostname}", _hostname);
-                // The worker will likely fail to start if this fails, which is fine for now.
+                return false;
             }
         }
 
         protected override async Task<Task> ExecuteAsync(CancellationToken stoppingToken)
         {
             stoppingToken.ThrowIfCancellationRequested();
+
+            var initialized = await InitializeRabbitMqAsync();
+            if (!initialized || _channel == null)
+            {
+                _logger.LogError("RabbitMQ channel is not initialized. Exiting consumer.");
+                return Task.CompletedTask;
+            }
 
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (model, ea) =>
