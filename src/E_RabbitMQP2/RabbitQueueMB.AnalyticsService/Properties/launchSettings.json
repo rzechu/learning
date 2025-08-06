@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RabbitQueueMB.AnalyticsService": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

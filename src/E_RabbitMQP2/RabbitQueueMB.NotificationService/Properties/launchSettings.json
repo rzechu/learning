@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RabbitQueueMB.NotificationService": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
