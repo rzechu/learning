@@ -43,15 +43,9 @@ namespace RabbitQueueMB.Consumer
                 _connection = await factory.CreateConnectionAsync();
                 _channel = await _connection.CreateChannelAsync();
 
-                await _channel.QueueDeclareAsync(queue: _queueName,
-                                      durable: true,
-                                      exclusive: false,
-                                      autoDelete: false,
-                                      arguments: null);
-
                 await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-                _logger.LogInformation("Consumer connected to RabbitMQ and declared queue '{QueueName}'", _queueName);
+                _logger.LogInformation("Consumer connected to RabbitMQ and declared queue '{QueueName}'", PaymentQueue);
 
                 await _channel.ExchangeDeclareAsync(PaymentDLQExchange, ExchangeType.Fanout, durable: true);
                 await _channel.QueueDeclareAsync(PaymentDLQ, durable: true, exclusive: false, autoDelete: false);
@@ -72,6 +66,10 @@ namespace RabbitQueueMB.Consumer
                 await _channel.QueueBindAsync(NotificationQueue, ResultExchange, "payment.failed");
                 await _channel.QueueBindAsync(AlertQueue, ResultExchange, "payment.failed");
                 await _channel.QueueBindAsync(AnalyticsQueue, ResultExchange, "payment.*");
+
+                await _channel.ExchangeDeclareAsync("payments_direct", ExchangeType.Direct, durable: true);
+                await _channel.QueueBindAsync(PaymentQueue, "payments_direct", "payments_card");
+                await _channel.QueueBindAsync(PaymentQueue, "payments_direct", "payments_paypal");
 
                 return true;
             }

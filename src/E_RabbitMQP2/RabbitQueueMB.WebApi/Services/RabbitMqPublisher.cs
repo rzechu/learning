@@ -8,7 +8,7 @@ public class RabbitMqPublisher : IDisposable
 {
     private readonly ILogger<RabbitMqPublisher> _logger;
     private readonly string _hostname;
-    private readonly string _queueName;
+    private readonly string _exchangeName = "payments_direct";
     private IConnection _connection;
     private IChannel _channel;
 
@@ -16,8 +16,6 @@ public class RabbitMqPublisher : IDisposable
     {
         _logger = logger;
         _hostname = configuration["RabbitMQ:Host"] ?? throw new ArgumentNullException("RabbitMQ:Host is not configured.");
-        _queueName = configuration["RabbitMQ:QueueName"] ?? "payment_queue";
-
         ConnectToRabbitMqAsync();
     }
 
@@ -26,17 +24,12 @@ public class RabbitMqPublisher : IDisposable
         try
         {
             var factory = new ConnectionFactory() { HostName = _hostname };
-
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            // Declare a durable queue
-            await _channel.QueueDeclareAsync(queue: _queueName,
-                                  durable: true,    // Durable queue survives RabbitMQ restarts
-                                  exclusive: false,
-                                  autoDelete: false,
-                                  arguments: null);
-            _logger.LogInformation("Connected to RabbitMQ and declared queue '{QueueName}'", _queueName);
+            // Declare the direct exchange
+            await _channel.ExchangeDeclareAsync(_exchangeName, ExchangeType.Direct, durable: true);
+            _logger.LogInformation("Connected to RabbitMQ and declared exchange '{ExchangeName}'", _exchangeName);
         }
         catch (Exception ex)
         {
@@ -44,12 +37,12 @@ public class RabbitMqPublisher : IDisposable
         }
     }
 
-    public async Task PublishPaymentIdAsync(Guid paymentId)
+    public async Task PublishPaymentIdAsync(Guid paymentId, string paymentMethod)
     {
         if (_channel == null || !_channel.IsOpen)
         {
             _logger.LogWarning("RabbitMQ channel is not open. Attempting to reconnect...");
-            await ConnectToRabbitMqAsync(); // Attempt to reconnect
+            await ConnectToRabbitMqAsync();
             if (_channel == null || !_channel.IsOpen)
             {
                 _logger.LogError("Failed to reconnect to RabbitMQ. Message will not be published.");
@@ -59,6 +52,13 @@ public class RabbitMqPublisher : IDisposable
 
         try
         {
+            var routingKey = paymentMethod.ToLower() switch
+            {
+                "creditcard" => "payments_card",
+                "paypal" => "payments_paypal",
+                _ => throw new ArgumentException("Unknown payment method")
+            };
+
             var message = JsonSerializer.Serialize(new { PaymentId = paymentId });
             var body = Encoding.UTF8.GetBytes(message);
 
@@ -66,12 +66,14 @@ public class RabbitMqPublisher : IDisposable
             properties.Persistent = true;
             properties.DeliveryMode = DeliveryModes.Persistent;
 
-            await _channel.BasicPublishAsync(exchange: "",
-                                  routingKey: _queueName,
-                                  mandatory: true,
-                                  basicProperties: properties,
-                                  body: body);
-            _logger.LogInformation("Published payment ID '{PaymentId}' to RabbitMQ.", paymentId);
+            await _channel.BasicPublishAsync(
+                exchange: _exchangeName,
+                routingKey: routingKey,
+                mandatory: true,
+                basicProperties: properties,
+                body: body
+            );
+            _logger.LogInformation("Published payment ID '{PaymentId}' to RabbitMQ with routing key '{RoutingKey}'.", paymentId, routingKey);
         }
         catch (Exception ex)
         {

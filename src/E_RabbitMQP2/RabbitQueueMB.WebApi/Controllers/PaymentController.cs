@@ -42,16 +42,22 @@ public class PaymentsController : ControllerBase
             Amount = paymentRequest.Amount,
             Currency = paymentRequest.Currency,
             PaymentMethod = paymentRequest.PaymentMethod,
-            Status = "Pending", // Set initial status as Pending
+            Status = "Pending",
             CreatedAt = DateTime.UtcNow
         };
 
         try
         {
+            if (payment?.PaymentMethod.ToLower() is not ("creditcard" or "paypal"))
+            {
+                _logger.LogWarning("Invalid payment method '{PaymentMethod}' for payment '{PaymentId}'", payment.PaymentMethod, payment.Id);
+                return BadRequest("Invalid payment method. Supported methods are 'CreditCard' and 'PayPal'.");
+            }
+
             await _context.Payments.AddAsync(payment);
             await _context.SaveChangesAsync();
 
-            _rabbitMqPublisher.PublishPaymentIdAsync(payment.Id);
+            _rabbitMqPublisher.PublishPaymentIdAsync(payment.Id, payment.PaymentMethod);
 
             _logger.LogInformation("Payment '{PaymentId}' created and queued for processing.", payment.Id);
             return Accepted(new { Message = "Payment has been queued for processing.", PaymentId = payment.Id, Status = payment.Status });

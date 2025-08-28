@@ -24,7 +24,12 @@ internal class Program
 
         await channel.BasicConsumeAsync(queue: "alert.queue", autoAck: false, consumer: consumer);
 
-        Console.WriteLine("Alert Service started. Press [enter] to exit.");
-        Console.ReadLine();
+        Console.WriteLine("Alert Service started. Press Ctrl+C to exit.");
+
+        // Keep the process alive
+        while (true)
+        {
+            await Task.Delay(1000);
+        }
     }
 }
