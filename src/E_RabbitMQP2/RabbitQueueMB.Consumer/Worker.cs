@@ -4,6 +4,7 @@ using RabbitMQ.Client.Events;
 using RabbitQueueMB.Consumer.Data;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace RabbitQueueMB.Consumer 
 {
@@ -70,6 +71,9 @@ namespace RabbitQueueMB.Consumer
                 await _channel.ExchangeDeclareAsync("payments_direct", ExchangeType.Direct, durable: true);
                 await _channel.QueueBindAsync(PaymentQueue, "payments_direct", "payments_card");
                 await _channel.QueueBindAsync(PaymentQueue, "payments_direct", "payments_paypal");
+
+                await _channel.ExchangeDeclareAsync("payments_log", ExchangeType.Fanout, durable: true);
+                await _channel.QueueBindAsync("logging.queue", "payments_log", "");
 
                 return true;
             }
@@ -159,6 +163,15 @@ namespace RabbitQueueMB.Consumer
                         await _channel.BasicPublishAsync(
                             exchange: ResultExchange,
                             routingKey: routingKey,
+                            mandatory: true,
+                            basicProperties: resultProps,
+                            body: resultBody
+                        );
+
+                        await _channel.ExchangeDeclareAsync("payments_log", ExchangeType.Fanout, durable: true);
+                        await _channel.BasicPublishAsync(
+                            exchange: "payments_log",
+                            routingKey: "",
                             mandatory: true,
                             basicProperties: resultProps,
                             body: resultBody

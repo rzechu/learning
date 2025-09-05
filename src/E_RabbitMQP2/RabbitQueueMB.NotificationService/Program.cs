@@ -25,6 +25,11 @@ internal class Program
         await channel.BasicConsumeAsync(queue: "notification.queue", autoAck: false, consumer: consumer);
 
         Console.WriteLine("Notification Service started. Press [enter] to exit.");
-        Console.ReadLine();
+
+        // Keep the process alive
+        while (true)
+        {
+            await Task.Delay(1000);
+        }
     }
 }

@@ -94,6 +94,16 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  logging-service:
+    build:
+      context: ./RabbitQueueMB.LoggingService
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   rabbitmq_data:
   postgres_data:
